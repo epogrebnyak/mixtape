@@ -6,18 +6,17 @@ import statsmodels.formula.api as smf
 
 
 def read_data(filename):
-    return pd.read_stata("https://raw.github.com/scunning1975/mixtape/master/" + filename)
+    url = "https://raw.github.com/scunning1975/mixtape/master/" + filename
+    return pd.read_stata(url)
 
 
+# import data
 abortion = read_data("abortion.dta")
 abortion = abortion[~pd.isnull(abortion.lnr)]
 abortion_bf15 = abortion[abortion.bf15 == 1]
 
-
-formula = (
-    "lnr ~ C(repeal)*C(year) + C(fip)"
-    " + acc + ir + pi + alcohol + crack + poverty + income + ur"
-)
+# fit regression
+formula = "lnr ~ C(repeal)*C(year) + C(fip) + acc + ir + pi + alcohol + crack + poverty + income + ur"
 
 reg = (smf.wls(formula, 
                data=abortion_bf15, 
@@ -26,21 +25,19 @@ reg = (smf.wls(formula,
                cov_kwds={"groups": abortion_bf15.fip.values}, 
                method="pinv"))
 
-reg.summary()
+print(reg.summary())
 
-abortion_plot = pd.DataFrame(
-    {
-        "sd": reg.bse["C(repeal)[T.1.0]:C(year)[T.1986.0]":"C(repeal)[T.1.0]:C(year)[T.2000.0]"],
-        "mean": reg.params["C(repeal)[T.1.0]:C(year)[T.1986.0]":"C(repeal)[T.1.0]:C(year)[T.2000.0]"],
-        "year": np.arange(1986, 2001),
-    }
-)
-abortion_plot["lb"] = abortion_plot["mean"] - abortion_plot["sd"] * 1.96
-abortion_plot["ub"] = abortion_plot["mean"] + abortion_plot["sd"] * 1.96
+# create dataframe for plotting
+abortion_df = pd.DataFrame()
+abortion_df["sd"] = reg.bse["C(repeal)[T.1.0]:C(year)[T.1986.0]":"C(repeal)[T.1.0]:C(year)[T.2000.0]"]
+abortion_df["mean"] = reg.params["C(repeal)[T.1.0]:C(year)[T.1986.0]":"C(repeal)[T.1.0]:C(year)[T.2000.0]"]
+abortion_df["year"] = np.arange(1986, 2001)
+abortion_df["lb"] = abortion_df["mean"] - abortion_df["sd"] * 1.96
+abortion_df["ub"] = abortion_df["mean"] + abortion_df["sd"] * 1.96
 
 # create plot with plotnine
 (
-    p.ggplot(abortion_plot, p.aes(x="year", y="mean"))
+    p.ggplot(abortion_df, p.aes(x="year", y="mean"))
     + p.geom_rect(
         p.aes(xmin=1985, xmax=1992, ymin=-np.inf, ymax=np.inf), fill="cyan", alpha=0.01
     )
